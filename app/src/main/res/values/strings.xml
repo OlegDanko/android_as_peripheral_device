@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">device_side</string>
+    <string name="action_settings">Settings</string>
+    <!-- Strings used for fragments for navigation -->
+    <string name="channel_selection_fragment_label">Channel Selection</string>
+    <string name="wifi_channel_fragment_label">Wifi Channel</string>
+    <string name="wifi_chan">Wifi</string>
+    <string name="previous">Previous</string>
+    <string name="wifi_method_qr_btn">Scan QR code</string>
+    <string name="wifi_method_code_btn">Ender connection code</string>
+    <string name="wifi_method_ip_addr_btn">Enter IP address</string>
+
+    <string name="select_channel_txt">Select connection channel</string>
+    <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
+    <string name="title_activity_controller">ControllerActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
+</resources>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/ChannelSelectionFragment">
+
+    <fragment
+        android:id="@+id/ChannelSelectionFragment"
+        android:name="com.olegdanko.device_side.ChannelSelectionFragment"
+        android:label="@string/channel_selection_fragment_label"
+        tools:layout="@layout/fragment_channel_selection">
+
+        <action
+            android:id="@+id/action_channel_selection_to_wifi"
+            app:destination="@id/WifiChannelFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/WifiChannelFragment"
+        android:name="com.olegdanko.device_side.WifiChannelFragment"
+        android:label="@string/wifi_channel_fragment_label"
+        tools:layout="@layout/fragment_wifi_channel">
+
+        <action
+            android:id="@+id/action_wifi_to_channel_selection"
+            app:destination="@id/ChannelSelectionFragment" />
+    </fragment>
+</navigation>
