@@ -5,7 +5,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.*
 import android.widget.Button
 import android.widget.LinearLayout
@@ -29,6 +28,16 @@ class ControllerActivity : AppCompatActivity() {
     private val hideHandler = Handler(Looper.myLooper()!!)
 
     private lateinit var connectionProvider: ConnectionProvider
+
+    fun set_click_handling(button: Button, name: String) {
+        button.setOnTouchListener{ _, event ->
+            when (event?.action) {
+                MotionEvent.ACTION_DOWN -> connectionProvider.send("press ${name}")
+                MotionEvent.ACTION_UP -> connectionProvider.send("release ${name}")
+            }
+            true
+        }
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,39 +71,72 @@ class ControllerActivity : AppCompatActivity() {
         // Set up the user interaction to manually show or hide the system UI.
         settingsButton = binding.btnControllerSettings
         settingsButton.setOnClickListener { connectionProvider.send("settings is pressed") }
-    }
 
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                // Reset the velocity tracker back to its initial state.
-                mVelocityTracker?.clear()
-                // If necessary retrieve a new VelocityTracker object to watch the
-                // velocity of a motion.
-                mVelocityTracker = mVelocityTracker ?: VelocityTracker.obtain()
-                // Add a user's movement to the tracker.
-                mVelocityTracker?.addMovement(event)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                mVelocityTracker?.apply {
-                    val pointerId: Int = event.getPointerId(event.actionIndex)
-                    addMovement(event)
-                    // When you want to determine the velocity, call
-                    // computeCurrentVelocity(). Then call getXVelocity()
-                    // and getYVelocity() to retrieve the velocity for each pointer ID.
-                    computeCurrentVelocity(1000)
-                    // Log velocity of pixels per second
-                    // Best practice to use VelocityTrackerCompat where possible.
-                    Log.d("", "velocity: { ${getXVelocity(pointerId)}; ${getYVelocity(pointerId)}}")
-                    connectionProvider.send("mouse_mv ${getXVelocity(pointerId)} ${getYVelocity(pointerId)}")
+        set_click_handling(binding.lmb, "lmb")
+        set_click_handling(binding.mmb, "mmb")
+        set_click_handling(binding.rmb, "rmb")
+
+        binding.btnMouseMovement.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    mVelocityTracker?.clear()
+                    mVelocityTracker = mVelocityTracker ?: VelocityTracker.obtain()
+                    mVelocityTracker?.addMovement(event)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    mVelocityTracker?.apply {
+                        val pointerId: Int = event.getPointerId(event.actionIndex)
+                        addMovement(event)
+                        computeCurrentVelocity(1000)
+                        var vX = getXVelocity(pointerId)
+                        var vY = getYVelocity(pointerId)
+                        connectionProvider.send("mouse_mv ${vX} ${vY}")
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    // Return a VelocityTracker object back to be re-used by others.
+                    mVelocityTracker?.recycle()
+                    mVelocityTracker = null
+                    connectionProvider.send("mouse_end")
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                // Return a VelocityTracker object back to be re-used by others.
-                mVelocityTracker?.recycle()
-                mVelocityTracker = null
-            }
+            true
         }
-        return true
     }
+
+//    override fun onTouchEvent(event: MotionEvent): Boolean {
+//        when (event.actionMasked) {
+//            MotionEvent.ACTION_DOWN -> {
+//                // Reset the velocity tracker back to its initial state.
+//                mVelocityTracker?.clear()
+//                // If necessary retrieve a new VelocityTracker object to watch the
+//                // velocity of a motion.
+//                mVelocityTracker = mVelocityTracker ?: VelocityTracker.obtain()
+//                // Add a user's movement to the tracker.
+//                mVelocityTracker?.addMovement(event)
+//            }
+//            MotionEvent.ACTION_MOVE -> {
+//                mVelocityTracker?.apply {
+//                    val pointerId: Int = event.getPointerId(event.actionIndex)
+//                    addMovement(event)
+//                    // When you want to determine the velocity, call
+//                    // computeCurrentVelocity(). Then call getXVelocity()
+//                    // and getYVelocity() to retrieve the velocity for each pointer ID.
+//                    computeCurrentVelocity(1000)
+//                    // Log velocity of pixels per second
+//                    // Best practice to use VelocityTrackerCompat where possible.
+//                    Log.d("", "velocity: { ${getXVelocity(pointerId)}; ${getYVelocity(pointerId)}}")
+//                    connectionProvider.send("mouse_mv ${getXVelocity(pointerId)} ${getYVelocity(pointerId)}")
+//                }
+//            }
+//            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+//                // Return a VelocityTracker object back to be re-used by others.
+//                mVelocityTracker?.recycle()
+//                mVelocityTracker = null
+//
+//                connectionProvider.send("mouse_end")
+//            }
+//        }
+//        return true
+//    }
 }

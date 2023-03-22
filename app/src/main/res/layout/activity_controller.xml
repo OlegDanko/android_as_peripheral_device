@@ -15,4 +15,50 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:text="Settings" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_mouse_movement"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="4"
+            android:text="Mouse movement" />
+
+        <LinearLayout
+            android:layout_width="190dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_gravity="right"
+            android:orientation="vertical">
+
+            <Button
+                android:id="@+id/rmb"
+                android:layout_width="match_parent"
+                android:layout_height="10dp"
+                android:layout_margin="0dp"
+                android:layout_weight="2"
+                android:text="right mouse button" />
+
+            <Button
+                android:id="@+id/mmb"
+                android:layout_width="match_parent"
+                android:layout_height="10dp"
+                android:layout_margin="0dp"
+                android:layout_weight="2"
+                android:text="middle mouse button" />
+
+            <Button
+                android:id="@+id/lmb"
+                android:layout_width="match_parent"
+                android:layout_height="10dp"
+                android:layout_margin="0dp"
+                android:layout_weight="2"
+                android:text="left mouse button" />
+        </LinearLayout>
+    </LinearLayout>
+
 </FrameLayout>
