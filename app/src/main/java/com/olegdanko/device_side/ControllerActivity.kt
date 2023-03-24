@@ -5,15 +5,53 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.*
 import android.widget.Button
 import android.widget.LinearLayout
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.olegdanko.device_side.databinding.ActivityControllerBinding
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
+class InputSender(var connectionProvider: ConnectionProvider) {
+    var xTotal = 0.0f
+    var yTotal = 0.0f
+    var last_move = System.nanoTime()
+    var move_rate_limit = 2000000
+
+    fun move(x: Float, y: Float) {
+        var now = System.nanoTime()
+
+        xTotal += x
+        yTotal += y
+
+        if ((now - last_move) < move_rate_limit) {
+            return
+        }
+        last_move = now
+
+        connectionProvider.send("mouse_mv ${xTotal} ${yTotal}")
+        xTotal = 0.0f
+        yTotal = 0.0f
+    }
+    fun moveDone() {
+        if(xTotal != 0.0f && yTotal != 0.0f) {
+            connectionProvider.send("mouse_mv ${xTotal} ${yTotal}")
+        }
+        connectionProvider.send("mouse_end")
+    }
+    fun press(btn: String) {
+        connectionProvider.send("press $btn")
+    }
+    fun release(btn: String) {
+        connectionProvider.send("release $btn")
+    }
+}
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -28,17 +66,18 @@ class ControllerActivity : AppCompatActivity() {
     private val hideHandler = Handler(Looper.myLooper()!!)
 
     private lateinit var connectionProvider: ConnectionProvider
-
+    private lateinit var inputSender: InputSender
     fun set_click_handling(button: Button, name: String) {
         button.setOnTouchListener{ _, event ->
             when (event?.action) {
-                MotionEvent.ACTION_DOWN -> connectionProvider.send("press ${name}")
-                MotionEvent.ACTION_UP -> connectionProvider.send("release ${name}")
+                MotionEvent.ACTION_DOWN -> inputSender.press(name)
+                MotionEvent.ACTION_UP -> inputSender.release(name)
             }
             true
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +88,8 @@ class ControllerActivity : AppCompatActivity() {
             finish()
             return
         }
+
+        inputSender = InputSender(connectionProvider)
 
         supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -79,25 +120,30 @@ class ControllerActivity : AppCompatActivity() {
         binding.btnMouseMovement.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+                    val current = LocalDateTime.now().format(formatter)
+                    Log.d("", "Down time is: ${current}")
                     mVelocityTracker?.clear()
                     mVelocityTracker = mVelocityTracker ?: VelocityTracker.obtain()
                     mVelocityTracker?.addMovement(event)
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+                    val current = LocalDateTime.now().format(formatter)
+                    Log.d("", "Move time is: ${current}")
                     mVelocityTracker?.apply {
                         val pointerId: Int = event.getPointerId(event.actionIndex)
                         addMovement(event)
                         computeCurrentVelocity(1000)
-                        var vX = getXVelocity(pointerId)
-                        var vY = getYVelocity(pointerId)
-                        connectionProvider.send("mouse_mv ${vX} ${vY}")
+                        inputSender.move(getXVelocity(pointerId), getYVelocity(pointerId))
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    Log.d("", "Up \n\n\n\n\n\n")
                     // Return a VelocityTracker object back to be re-used by others.
                     mVelocityTracker?.recycle()
                     mVelocityTracker = null
-                    connectionProvider.send("mouse_end")
+                    inputSender.moveDone()
                 }
             }
             true
