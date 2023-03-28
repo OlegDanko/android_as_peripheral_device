@@ -15,41 +15,113 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.olegdanko.device_side.databinding.ActivityControllerBinding
+import okhttp3.internal.notify
+import okhttp3.internal.wait
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.*
+
+class Vec2(var x: Float, var y: Float) {}
+
+interface IEvent {}
+class MovementEvent(private var coords: Vec2) : IEvent {
+    fun add(event: MovementEvent) {
+        coords.x += event.coords.x
+        coords.y += event.coords.y
+    }
+
+    override fun toString(): String {
+        return "mouse_mv ${coords.x} ${coords.y}"
+    }
+}
+class MouseButtonEvent(private val name: String, private val isPressed: Boolean) : IEvent {
+    override fun toString(): String {
+        return "${if(isPressed) "press" else "release"} $name"
+    }
+}
+class MouseEndEvent : IEvent {
+    override fun toString(): String {
+        return "mouse_end"
+    }
+}
 
 class InputSender(var connectionProvider: ConnectionProvider) {
-    var xTotal = 0.0f
-    var yTotal = 0.0f
-    var last_move = System.nanoTime()
-    var move_rate_limit = 2000000
+    private var eventQueue = ArrayDeque<IEvent>()
+    private var lastEvent : IEvent? = null
+    private var lastMovementEvent : MovementEvent? = null
+
+    private var running: Boolean = true
+    private var lock = Any()
+    private var senderThread = Thread {
+        while (true) {
+            synchronized(lock) {
+                if(!running) {
+                    return@Thread
+                }
+                if(!eventQueue.isEmpty()) {
+                    return@synchronized
+                }
+                lock.wait()
+            }
+            Thread.sleep(8)
+
+            val eQueue = takeEvents()
+            var message = ""
+            while(!eQueue.isEmpty()) {
+                message += eQueue.first.toString()
+                message += " "
+                eQueue.pop()
+            }
+            connectionProvider.send(message)
+        }
+    }
+
+    init {
+        senderThread.start()
+    }
+
+    fun stop() {
+        synchronized(lock) {
+            running = false
+            lock.notify()
+        }
+        senderThread.join()
+    }
+
+    private fun takeEvents() : ArrayDeque<IEvent> {
+        synchronized(lock) {
+            val q = eventQueue;
+            eventQueue = ArrayDeque<IEvent>()
+            lastEvent = null
+            return q
+        }
+    }
+    private fun addEvent(event: IEvent) {
+        synchronized(lock) {
+            eventQueue.add(event)
+            lastEvent = event
+            lock.notify()
+        }
+    }
 
     fun move(x: Float, y: Float) {
-        var now = System.nanoTime()
-
-        xTotal += x
-        yTotal += y
-
-        if ((now - last_move) < move_rate_limit) {
-            return
+        val movementEvent = MovementEvent(Vec2(x, y))
+        synchronized(lock) {
+            if (lastEvent == lastMovementEvent) {
+                lastMovementEvent?.let { e -> e.add(movementEvent); return }
+            }
         }
-        last_move = now
-
-        connectionProvider.send("mouse_mv ${xTotal} ${yTotal}")
-        xTotal = 0.0f
-        yTotal = 0.0f
+        addEvent(movementEvent)
+        lastMovementEvent = movementEvent
     }
     fun moveDone() {
-        if(xTotal != 0.0f && yTotal != 0.0f) {
-            connectionProvider.send("mouse_mv ${xTotal} ${yTotal}")
-        }
-        connectionProvider.send("mouse_end")
+        addEvent(MouseEndEvent())
     }
     fun press(btn: String) {
-        connectionProvider.send("press $btn")
+        addEvent(MouseButtonEvent(btn, true))
     }
     fun release(btn: String) {
-        connectionProvider.send("release $btn")
+        addEvent(MouseButtonEvent(btn, false))
     }
 }
 
@@ -135,7 +207,9 @@ class ControllerActivity : AppCompatActivity() {
                         val pointerId: Int = event.getPointerId(event.actionIndex)
                         addMovement(event)
                         computeCurrentVelocity(1000)
-                        inputSender.move(getXVelocity(pointerId), getYVelocity(pointerId))
+                        val x = getXVelocity(pointerId)
+                        val y = getYVelocity(pointerId)
+                        inputSender.move(x, y)
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -148,6 +222,11 @@ class ControllerActivity : AppCompatActivity() {
             }
             true
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        inputSender.stop()
     }
 
 //    override fun onTouchEvent(event: MotionEvent): Boolean {
