@@ -125,12 +125,31 @@ class InputSender(var connectionProvider: ConnectionProvider) {
     }
 }
 
+class PositionTracker(var coords: Vec2 = Vec2(0.0f, 0.0f)) {
+
+    fun set(newCoords: Vec2) {
+        coords = newCoords
+    }
+    fun set(x: Float, y :Float) {
+        set(Vec2(x, y))
+    }
+    fun move(x: Float, y :Float) : Vec2 {
+        val delta = Vec2(x - coords.x, y - coords.y)
+        set(x, y)
+        return delta
+    }
+    fun move(newCoords: Vec2) : Vec2 {
+        return move(newCoords.x, newCoords.y)
+    }
+}
+
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
  * status bar and navigation/system bar) with user interaction.
  */
 class ControllerActivity : AppCompatActivity() {
     private var mVelocityTracker: VelocityTracker? = null
+    private var mPositionTracker = PositionTracker()
 
     private lateinit var binding: ActivityControllerBinding
     private lateinit var settingsButton: Button
@@ -190,33 +209,22 @@ class ControllerActivity : AppCompatActivity() {
         set_click_handling(binding.rmb, "rmb")
 
         binding.btnMouseMovement.setOnTouchListener { _, event ->
+            // TODO: remove touch slop
+            val getCoords = {
+                val pointerIndex = event.findPointerIndex(
+                    event.getPointerId(event.actionIndex)
+                )
+                Vec2(event.getX(pointerIndex), event.getY(pointerIndex))
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
-                    val current = LocalDateTime.now().format(formatter)
-                    Log.d("", "Down time is: ${current}")
-                    mVelocityTracker?.clear()
-                    mVelocityTracker = mVelocityTracker ?: VelocityTracker.obtain()
-                    mVelocityTracker?.addMovement(event)
+                    mPositionTracker.set(getCoords())
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
-                    val current = LocalDateTime.now().format(formatter)
-                    Log.d("", "Move time is: ${current}")
-                    mVelocityTracker?.apply {
-                        val pointerId: Int = event.getPointerId(event.actionIndex)
-                        addMovement(event)
-                        computeCurrentVelocity(1000)
-                        val x = getXVelocity(pointerId)
-                        val y = getYVelocity(pointerId)
-                        inputSender.move(x, y)
-                    }
+                    val delta = mPositionTracker.move(getCoords())
+                    inputSender.move(delta.x, delta.y)
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    Log.d("", "Up \n\n\n\n\n\n")
-                    // Return a VelocityTracker object back to be re-used by others.
-                    mVelocityTracker?.recycle()
-                    mVelocityTracker = null
                     inputSender.moveDone()
                 }
             }
@@ -228,40 +236,4 @@ class ControllerActivity : AppCompatActivity() {
         super.onDestroy()
         inputSender.stop()
     }
-
-//    override fun onTouchEvent(event: MotionEvent): Boolean {
-//        when (event.actionMasked) {
-//            MotionEvent.ACTION_DOWN -> {
-//                // Reset the velocity tracker back to its initial state.
-//                mVelocityTracker?.clear()
-//                // If necessary retrieve a new VelocityTracker object to watch the
-//                // velocity of a motion.
-//                mVelocityTracker = mVelocityTracker ?: VelocityTracker.obtain()
-//                // Add a user's movement to the tracker.
-//                mVelocityTracker?.addMovement(event)
-//            }
-//            MotionEvent.ACTION_MOVE -> {
-//                mVelocityTracker?.apply {
-//                    val pointerId: Int = event.getPointerId(event.actionIndex)
-//                    addMovement(event)
-//                    // When you want to determine the velocity, call
-//                    // computeCurrentVelocity(). Then call getXVelocity()
-//                    // and getYVelocity() to retrieve the velocity for each pointer ID.
-//                    computeCurrentVelocity(1000)
-//                    // Log velocity of pixels per second
-//                    // Best practice to use VelocityTrackerCompat where possible.
-//                    Log.d("", "velocity: { ${getXVelocity(pointerId)}; ${getYVelocity(pointerId)}}")
-//                    connectionProvider.send("mouse_mv ${getXVelocity(pointerId)} ${getYVelocity(pointerId)}")
-//                }
-//            }
-//            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-//                // Return a VelocityTracker object back to be re-used by others.
-//                mVelocityTracker?.recycle()
-//                mVelocityTracker = null
-//
-//                connectionProvider.send("mouse_end")
-//            }
-//        }
-//        return true
-//    }
 }
